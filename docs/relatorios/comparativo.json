@@ -1,0 +1,110 @@
+{
+  "antes": {
+    "lcp": 1097.6735,
+    "fcp": 1097.6735,
+    "tbt": 91.5,
+    "cls": 0,
+    "bytes": 15569,
+    "requests": 8,
+    "scores": {
+      "performance": 100,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    }
+  },
+  "depois": {
+    "lcp": 1016.0289,
+    "fcp": 1016.0289,
+    "tbt": 11,
+    "cls": 0,
+    "bytes": 13070,
+    "requests": 8,
+    "scores": {
+      "performance": 100,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    }
+  },
+  "benchmark": [
+    {
+      "phase": "antes",
+      "count": 0,
+      "script": 0.20000000298023224,
+      "total": 0.8999999985098839
+    },
+    {
+      "phase": "formatador",
+      "count": 0,
+      "script": 0.19999999925494194,
+      "total": 0.8000000007450581
+    },
+    {
+      "phase": "depois",
+      "count": 0,
+      "script": 0.19999999925494194,
+      "total": 0.8999999985098839
+    },
+    {
+      "phase": "antes",
+      "count": 365,
+      "script": 124.5,
+      "total": 183.5
+    },
+    {
+      "phase": "formatador",
+      "count": 365,
+      "script": 17,
+      "total": 75.10000000149012
+    },
+    {
+      "phase": "depois",
+      "count": 365,
+      "script": 22.599999997764826,
+      "total": 35
+    }
+  ],
+  "files": [
+    {
+      "file": "index.html",
+      "antes": 2764,
+      "depois": 2435
+    },
+    {
+      "file": "style.css",
+      "antes": 4637,
+      "depois": 4034
+    },
+    {
+      "file": "script.js",
+      "antes": 6235,
+      "depois": 5143
+    },
+    {
+      "file": "service-worker.js",
+      "antes": 1240,
+      "depois": 976
+    },
+    {
+      "file": "manifest.json",
+      "antes": 520,
+      "depois": 443
+    },
+    {
+      "file": "icons/icon-192.png",
+      "antes": 1139,
+      "depois": 369
+    },
+    {
+      "file": "icons/icon-512.png",
+      "antes": 3892,
+      "depois": 1093
+    },
+    {
+      "file": "icons/brand.webp",
+      "antes": 0,
+      "depois": 664
+    }
+  ]
+}

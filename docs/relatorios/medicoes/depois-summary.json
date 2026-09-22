@@ -1,0 +1,47 @@
+[
+  {
+    "run": 1,
+    "scores": {
+      "performance": 100,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    },
+    "lcp": 1013.2419,
+    "fcp": 1013.2419,
+    "tbt": 45,
+    "cls": 0,
+    "bytes": 13722,
+    "requests": 8
+  },
+  {
+    "run": 2,
+    "scores": {
+      "performance": 100,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    },
+    "lcp": 1016.3698999999999,
+    "fcp": 1016.3698999999999,
+    "tbt": 0,
+    "cls": 0,
+    "bytes": 13070,
+    "requests": 8
+  },
+  {
+    "run": 3,
+    "scores": {
+      "performance": 100,
+      "accessibility": 100,
+      "best-practices": 100,
+      "seo": 100
+    },
+    "lcp": 1016.0289,
+    "fcp": 1016.0289,
+    "tbt": 11,
+    "cls": 0,
+    "bytes": 13070,
+    "requests": 8
+  }
+]
