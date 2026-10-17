@@ -1,5 +1,5 @@
 const CACHE_PREFIX = `diario-de-bordo-${self.registration.scope}-`;
-const CACHE_NAME = `${CACHE_PREFIX}performance-v1`;
+const CACHE_NAME = `${CACHE_PREFIX}__CACHE_VERSION__`;
 const ASSETS = ['./', './index.html', './style.css', './script.js', './manifest.json', './icons/brand.webp', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {

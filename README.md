@@ -1,145 +1,72 @@
 # Diário de Bordo — otimização de performance
 
-PWA para criar, listar e remover atividades diárias, com persistência em localStorage, instalação e funcionamento offline. O projeto utiliza HTML, CSS e JavaScript, sem framework ou dependências de execução no navegador.
+PWA para registrar atividades diárias (criar, listar e remover), com dados em `localStorage`, instalável e funcional offline. HTML, CSS e JavaScript puros, sem framework. O projeto documenta um ciclo completo: diagnóstico, correção, medição antes/depois e um servidor Python de produção.
 
-## Execução
+## Resultados
+
+Lighthouse mobile, mediana de 3 execuções por versão, com 365 registros (um ano de uso). Medições de 22/09/2026.
+
+| Métrica | Antes | Depois | Variação |
+|---|---:|---:|---:|
+| Notas Lighthouse (4 categorias) | 100 | 100 | Mantidas |
+| TBT (bloqueio da thread principal) | 91,5 ms | 11,0 ms | −88,0% |
+| LCP / FCP | 1.097,7 ms | 1.016,0 ms | −7,4% |
+| Transferência observada | 15.569 B | 13.070 B | −16,1% |
+| Renderização da lista, 365 itens (CPU 4× mais lenta) | 183,5 ms | 35,0 ms | −80,9% |
+| Peso dos arquivos da aplicação | 20.427 B | 15.157 B | −25,8% |
+
+A nota já estava em 100 antes das mudanças: o ganho está nos tempos e no volume transferido, não na pontuação. Foram medições de laboratório e variam entre execuções (o TBT "antes" oscilou de 0 a 108 ms); por isso a tabela usa medianas.
+
+**Método:** Lighthouse 12.8.2 e Chrome for Testing 147 em modo headless, perfil de 412×823 px, rede simulada (RTT 150 ms, 1.638,4 Kbps), CPU 4× mais lenta, perfil novo a cada execução, mesmo servidor e mesmos dados nas duas versões, sem compressão HTTP em nenhuma delas.
+
+| Antes | Depois |
+|---|---|
+| ![Lighthouse antes](docs/relatorios/antes.png) | ![Lighthouse depois](docs/relatorios/depois.png) |
+
+Evidências: relatórios completos [antes](docs/relatorios/antes.html) e [depois](docs/relatorios/depois.html), [medições originais](docs/relatorios/medicoes/), [comparativo.json](docs/relatorios/comparativo.json) e [benchmark.json](docs/relatorios/benchmark.json).
+
+## O que foi feito
+
+- **Formatação de datas:** a listagem criava 365 `Intl.DateTimeFormat` a cada atualização; agora reutiliza uma instância. Foi a maior redução isolada de JavaScript (124,5 → 17,0 ms).
+- **Lista longa:** montagem em `DocumentFragment`, um único listener por delegação de eventos e `content-visibility: auto` nos cartões, que adia o layout do que está fora da tela.
+- **Imagens:** o cabeçalho passou de PNG 192×192 para WebP sem perdas de 84×84 (exibido a 42×42, −41,7%); os ícones de instalação foram comprimidos.
+- **Build:** minificação de HTML, CSS, JavaScript e manifest (html-minifier-terser, clean-css, Terser).
+- **Cache do service worker:** o nome do cache era fixo (`performance-v1`), então quem já tinha visitado o app continuava recebendo CSS e JavaScript antigos após uma atualização. Agora o nome é um hash do conteúdo, calculado no build, e cada versão nova cria o cache novo e remove o anterior.
+- **Servidor Python (FastAPI):** serve o `dist/` com gzip, ETag e cabeçalhos de segurança, incluindo uma Content-Security-Policy restritiva.
+
+## Como executar
 
 Requer Node.js 22 ou superior.
 
-```sh
+```powershell
 npm ci
 npm run build
 npm run dev
 ```
 
-A aplicação fica disponível em **http://localhost:8081**. `src/` contém o código editável e `dist/` contém a versão minificada. Após alterar os fontes, execute o build novamente. O modo offline e a instalação exigem localhost ou HTTPS.
+O servidor de desenvolvimento fica em **http://localhost:8081**. O modo offline e a instalação exigem localhost ou HTTPS.
 
-## Estrutura
+### Servidor de produção (Python)
 
-```text
-src/                    Código-fonte e imagens originais
-dist/                   Aplicação otimizada, pronta para hospedagem
-tools/                  Build, servidor, auditoria e benchmark
-docs/baseline/          Cópia da aplicação antes das alterações
-docs/relatorios/        Prints, relatórios completos e comparação
-docs/relatorios/medicoes/  Dados das seis execuções do Lighthouse
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r server/requirements.txt
+.\.venv\Scripts\python.exe -m server
 ```
 
-## Diagnóstico
+Fica em **http://localhost:8000**, com `/healthz` para checagem de saúde. Variáveis opcionais: `HOST` (padrão `127.0.0.1`), `PORT` (`8000`) e `DIST_DIR` (`dist/`). Exige o build prévio. Os arquivos não têm hash no nome, então todos são servidos com `Cache-Control: no-cache` e ETag: o navegador revalida (304) e o service worker entrega o carregamento rápido e offline. Fora do localhost, publique atrás de um proxy com HTTPS.
 
-O cenário principal representa um ano de uso: 365 atividades de teste, com os mesmos títulos, descrições e datas nas duas versões. Esses dados são inseridos apenas pelos scripts de medição e não acompanham a aplicação publicada.
+### Testes
 
-- **Formatação de datas:** a listagem criava 365 instâncias de `Intl.DateTimeFormat` a cada atualização. Um benchmark isolado confirmou o custo dessa operação.
-- **Lista extensa:** o Lighthouse identificou 2.226 elementos no DOM. O navegador calculava o layout de todos os cartões, inclusive fora da tela.
-- **Eventos repetidos:** cada entrada recebia uma função de clique própria para remoção.
-- **Imagem superdimensionada:** o cabeçalho exibia um PNG de 192×192 pixels em uma área de 42×42 pixels.
-- **Arquivos sem minificação:** HTML, CSS, JavaScript e manifest eram servidos com a formatação dos fontes.
-- **CSS bloqueante e compressão HTTP:** o relatório também apontou a folha de estilos no caminho crítico e ausência de compressão de texto no servidor de teste.
+```powershell
+npm test
+.\.venv\Scripts\python.exe -m pip install -r server/requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest
+```
 
-## Alterações
+`npm test` cobre o hash do cache e o build (determinismo, mudança de 1 byte, falha sem o marcador). O `pytest` cobre o servidor, incluindo o `dist/` real; sem o build, os testes de integração falham.
 
-1. Reutilização de uma única instância de `Intl.DateTimeFormat`.
-2. Montagem da lista em `DocumentFragment` e substituição em uma única operação.
-3. Delegação do evento de remoção para a lista, eliminando as funções de clique individuais.
-4. `content-visibility: auto` e `contain-intrinsic-size` nos cartões, adiando o layout dos registros fora da área visível.
-5. Conversão da imagem do cabeçalho para WebP sem perdas, redimensionada para 84×84 pixels para atender telas com densidade 2×. O tamanho exibido permanece 42×42.
-6. Compressão dos ícones PNG de instalação, mantendo as resoluções de 192×192 e 512×512.
-7. Minificação de HTML com html-minifier-terser, CSS com clean-css e JavaScript com Terser. O manifest também é compactado.
-8. Remoção da classe sem uso `entries-section` e atualização dos arquivos precacheados pelo service worker.
-
-As ferramentas de build ficam em `devDependencies`. Não havia bibliotecas pesadas no navegador para substituir nem imports mortos. Os estilos de formulário, erro, foco, instalação e responsividade foram preservados, pois são usados em estados diferentes da aplicação.
-
-### Carregamento adiado
-
-A única imagem de conteúdo está no cabeçalho, visível desde o primeiro carregamento. Não foi aplicado `loading="lazy"` a ela, pois isso atrasaria uma imagem já necessária. Não há imagens abaixo da dobra nem iframes. O adiamento foi aplicado à renderização dos cartões com `content-visibility`. Essa decisão segue a [orientação sobre imagens visíveis no primeiro carregamento](https://web.dev/learn/performance/lazy-load-images-and-iframe-elements).
-
-## Método de medição
-
-- Data: 22/09/2026.
-- Lighthouse 12.8.2 executado programaticamente com Chrome for Testing 147.0.7727.57, em modo headless e sem extensões.
-- Perfil mobile de 412×823 pixels, densidade 1,75, rede simulada com RTT de 150 ms e throughput de 1.638,4 Kbps; CPU simulada 4× mais lenta.
-- Três execuções consecutivas por versão, sempre com um perfil novo, sem cache ou service worker previamente instalado.
-- Mesmo servidor HTTP local, endereço, configuração e conjunto de 365 registros. Não foi ativada compressão HTTP em nenhuma versão.
-- `disableStorageReset` preserva os registros previamente inseridos; o perfil novo evita reaproveitar caches entre execuções.
-- A tabela apresenta a mediana de cada métrica. Nenhuma execução foi descartada. As notas e tempos são medições de laboratório, sujeitos a variação.
-
-O relatório anterior obtido pelo IP da rede não foi utilizado nesta comparação: endereço, extensões e condições de execução seriam diferentes.
-
-## Comparativo Lighthouse
-
-| Métrica | Antes | Depois | Variação |
-|---|---:|---:|---:|
-| Desempenho | 100 | 100 | Mantido |
-| Acessibilidade | 100 | 100 | Mantida |
-| Boas práticas | 100 | 100 | Mantidas |
-| SEO | 100 | 100 | Mantido |
-| LCP | 1.097,7 ms | 1.016,0 ms | −7,4% |
-| FCP | 1.097,7 ms | 1.016,0 ms | −7,4% |
-| TBT | 91,5 ms | 11,0 ms | −88,0% |
-| CLS | 0 | 0 | Mantido |
-| Transferência observada | 15.569 B | 13.070 B | −16,1% |
-| Requisições observadas | 8 | 8 | Mantidas |
-
-A pontuação inicial já estava no teto. O ganho está nos tempos, no bloqueio da thread principal e no volume transferido, não em um aumento artificial da nota.
-
-### Execuções individuais
-
-| Versão / execução | Desempenho | FCP (ms) | LCP (ms) | TBT (ms) | CLS | Bytes |
-|---|---:|---:|---:|---:|---:|---:|
-| Antes 1 | 100 | 757,3 | 1.085,3 | 91,5 | 0,004349 | 16.298 |
-| Antes 2 | 100 | 1.097,7 | 1.097,7 | 0 | 0 | 15.569 |
-| Antes 3 | 99 | 1.097,7 | 1.097,7 | 108 | 0 | 15.569 |
-| Depois 1 | 100 | 1.013,2 | 1.013,2 | 45 | 0 | 13.722 |
-| Depois 2 | 100 | 1.016,4 | 1.016,4 | 0 | 0 | 13.070 |
-| Depois 3 | 100 | 1.016,0 | 1.016,0 | 11 | 0 | 13.070 |
-
-A variação de TBT e FCP mostra por que um único resultado não deve ser tratado como garantia. A transferência observada depende das requisições capturadas durante cada auditoria e não equivale ao tamanho de todos os arquivos da aplicação.
-
-### Relatórios e prints
-
-Os prints correspondem às execuções com o TBT mediano: antes 1 e depois 3. São execuções individuais; a tabela principal combina medianas de três execuções. O Lighthouse arredonda alguns valores na apresentação.
-
-**Antes** — [relatório completo](docs/relatorios/antes.html)
-
-![Lighthouse antes das otimizações](docs/relatorios/antes.png)
-
-**Depois** — [relatório completo](docs/relatorios/depois.html)
-
-![Lighthouse depois das otimizações](docs/relatorios/depois.png)
-
-Os [JSONs originais](docs/relatorios/medicoes/) permitem verificar as métricas, condições e auditorias. O [comparativo estruturado](docs/relatorios/comparativo.json) reúne as medianas e tamanhos dos arquivos.
-
-## Impacto das alterações na listagem
-
-Um segundo teste isolou `render()` e o cálculo de layout, com CPU 4× mais lenta. Foram coletadas sete amostras após um aquecimento, sem service worker, para cada versão. A variante intermediária modifica apenas a reutilização do formatador de datas; ela não faz parte da aplicação final.
-
-| Cenário com 365 registros | JavaScript, mediana | JavaScript + layout, mediana |
-|---|---:|---:|
-| Original | 124,5 ms | 183,5 ms |
-| Apenas formatador reutilizado | 17,0 ms | 75,1 ms |
-| Todas as otimizações | 22,6 ms | 35,0 ms |
-
-A reutilização do formatador trouxe a maior redução isolada de JavaScript. As demais alterações reduziram principalmente o custo de layout; não foram medidas separadamente entre si. A versão completa reduziu o tempo total em **80,9%**. A mediana da lista vazia permaneceu em **0,9 ms**, sem ganho relevante nesse cenário. Esse benchmark não mede INP nem substitui o Lighthouse. As amostras estão em [benchmark.json](docs/relatorios/benchmark.json).
-
-## Tamanho dos recursos
-
-| Arquivo | Antes | Depois |
-|---|---:|---:|
-| HTML | 2.764 B | 2.435 B |
-| CSS | 4.637 B | 4.034 B |
-| JavaScript da aplicação | 6.235 B | 5.143 B |
-| Service worker | 1.240 B | 976 B |
-| Manifest | 520 B | 443 B |
-| Ícone PNG 192 | 1.139 B | 369 B |
-| Ícone PNG 512 | 3.892 B | 1.093 B |
-| WebP do cabeçalho | — | 664 B |
-| **Total da aplicação** | **20.427 B** | **15.157 B** |
-
-Redução total de **25,8%** em disco. O recurso visual do cabeçalho passou de 1.139 B para 664 B, redução de **41,7%**. Fontes, relatórios e ferramentas de desenvolvimento não entram no total.
-
-## Reproduzir as medições
-
-Após `npm ci` e `npm run build`, defina `CHROME_PATH` com o executável do Chrome instalado. Exemplo no PowerShell:
+### Reproduzir as medições
 
 ```powershell
 $env:CHROME_PATH = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
@@ -149,10 +76,22 @@ npm run benchmark
 npm run reports
 ```
 
-Os scripts usam as portas locais 4175 e 4176. Cada auditoria cria um perfil temporário em `.audit/` e grava os resultados em `docs/relatorios/`. Novas execuções substituem as evidências; os números do README devem ser atualizados de acordo com os resultados. A reprodução exata requer as mesmas versões de Chrome e ferramentas, mas os tempos ainda podem variar conforme a máquina.
+Cada execução grava em `docs/relatorios/` e **substitui** as evidências atuais. A reprodução exata exige as mesmas versões de Chrome e ferramentas; os tempos variam conforme a máquina.
 
-## Validação e limites
+## Estrutura
 
-Na versão minificada foram verificados criação, listagem, remoção, cancelamento, persistência após recarga, cadastro em HTTP comum, recarga e operações offline em localhost, manifest, critérios de instalação e larguras de 320, 375, 768 e 1440 pixels.
+```text
+src/        Código-fonte e imagens originais
+dist/       Aplicação otimizada, pronta para hospedagem
+server/     Servidor de produção em Python (FastAPI)
+tools/      Build, servidor de desenvolvimento, auditoria, benchmark e testes
+tests/      Testes do servidor (pytest)
+docs/       Versão original (baseline) e relatórios das medições
+```
 
-O DOM continua com todos os registros para preservar a navegação e a busca na página. `content-visibility` reduz o trabalho de renderização, mas não a contagem de elementos. A folha de estilos continua bloqueante, agora menor. Compressão HTTP e políticas de cache de produção permanecem dependentes da hospedagem. Não foi atribuída a essas melhorias não implementadas nenhuma redução nas métricas.
+## Limites
+
+- As medições são anteriores ao versionamento do cache e ao servidor Python e **não foram refeitas**. A única mudança em arquivo publicado foi o `service-worker.js` (976 → 974 B).
+- O ganho de cada mudança de renderização, além do formatador de datas, não foi medido separadamente.
+- O DOM mantém todos os registros (preserva a navegação e a busca na página); `content-visibility` reduz o trabalho de renderização, não a contagem de elementos. A folha de estilos continua bloqueante, agora menor.
+- O servidor Python foi validado por testes automatizados e em Chrome headless no localhost (atualização do cache, uso offline, ausência de erros de CSP), com Python 3.14. Instalação do PWA, HTTPS e hospedagem real não foram validados, e o gzip não foi medido com o Lighthouse.

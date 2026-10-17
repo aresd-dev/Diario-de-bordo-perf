@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "node tools/build.cjs",
+    "test": "node --test \"tools/*.test.cjs\"",
     "dev": "node tools/serve.cjs",
     "audit": "node tools/audit.mjs",
     "benchmark": "node tools/benchmark.cjs",
